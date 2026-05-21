@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Camera PWA</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+    .controls {
+      position: fixed;
+      bottom: env(safe-area-inset-bottom, 20px);
+      left: 0;
+      right: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      z-index: 10;
+    }
+    button {
+      padding: 14px 24px;
+      font-size: 16px;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 999px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      cursor: pointer;
+    }
+    button:active { background: rgba(255,255,255,0.3); }
+    #message {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      padding: 20px;
+      z-index: 5;
+    }
+    #message.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay playsinline muted></video>
+  <div id="message">
+    <p style="margin-bottom: 16px;">カメラを起動します</p>
+    <button id="startBtn">スタート</button>
+  </div>
+  <div class="controls" id="controls" style="display:none;">
+    <button id="switchBtn">切替</button>
+    <button id="stopBtn">停止</button>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const startBtn = document.getElementById('startBtn');
+    const switchBtn = document.getElementById('switchBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const message = document.getElementById('message');
+    const controls = document.getElementById('controls');
+
+    let currentStream = null;
+    let useFront = false;
+
+    async function startCamera() {
+      try {
+        if (currentStream) {
+          currentStream.getTracks().forEach(t => t.stop());
+        }
+        const constraints = {
+          video: { facingMode: useFront ? 'user' : 'environment' },
+          audio: false
+        };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+        message.classList.add('hidden');
+        controls.style.display = 'flex';
+      } catch (err) {
+        message.innerHTML = `<p>カメラを起動できません</p><p style="font-size:14px;margin-top:8px;opacity:0.7;">${err.message}</p>`;
+      }
+    }
+
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+      }
+      video.srcObject = null;
+      controls.style.display = 'none';
+      message.classList.remove('hidden');
+      message.innerHTML = `<p style="margin-bottom: 16px;">カメラを起動します</p>`;
+      const newBtn = document.createElement('button');
+      newBtn.textContent = 'スタート';
+      newBtn.onclick = startCamera;
+      message.appendChild(newBtn);
+    }
+
+    startBtn.addEventListener('click', startCamera);
+    switchBtn.addEventListener('click', () => {
+      useFront = !useFront;
+      startCamera();
+    });
+    stopBtn.addEventListener('click', stopCamera);
+
+    // Service Worker 登録
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW登録失敗:', err));
+      });
+    }
+  </script>
+</body>
+</html>
